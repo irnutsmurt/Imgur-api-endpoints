@@ -704,21 +704,122 @@ Example request body:
 POST /channels/messaging/{channelId}/query
 ```
 
-Returns information and recent messages for a specific messaging channel.
+Returns the current state of a specific Imgur direct-message channel.
 
-Example body:
+A browser-originated request commonly looks like:
+
+```text
+https://chat-us-east-imgur.stream-io-api.com/channels/messaging/{CHANNEL_ID}/query
+    ?user_id={USER_ID}
+    &api_key={API_KEY}
+    &connection_id={CONNECTION_ID}
+```
+
+### Parameters
+
+- `CHANNEL_ID` — identifies the Stream messaging channel / Imgur DM conversation.
+- `USER_ID` — the authenticated Imgur/Stream user ID.
+- `API_KEY` — the Stream API key used by Imgur's messaging frontend.
+- `CONNECTION_ID` — identifies the active Stream client connection/session.
+- `Authorization` — contains the Stream JWT obtained through Imgur's messaging-token flow.
+
+Typical headers:
+
+```http
+Authorization: <STREAM_JWT>
+Content-Type: application/json
+stream-auth-type: jwt
+x-stream-client: stream-chat-javascript-client-browser-1.2.2
+```
+
+A typical request body is:
 
 ```json
 {
   "data": {},
   "state": true,
-  "watch": false,
-  "presence": false,
-  "messages": {
-    "limit": 25
-  }
+  "watch": true,
+  "presence": false
 }
 ```
+
+`state: true` requests the current channel state.
+
+`watch: true` tells Stream to watch the channel for updates associated with the active connection.
+
+`presence: false` means presence information is not requested.
+
+The exact body can vary by client. For example, an integration that only wants to query state without subscribing to channel updates may use `watch: false`.
+
+### cURL example
+
+```bash
+curl -X POST \
+  'https://chat-us-east-imgur.stream-io-api.com/channels/messaging/{CHANNEL_ID}/query?user_id={USER_ID}&api_key={API_KEY}&connection_id={CONNECTION_ID}' \
+  -H 'Authorization: {STREAM_JWT}' \
+  -H 'Content-Type: application/json;charset=UTF-8' \
+  -H 'stream-auth-type: jwt' \
+  -H 'x-stream-client: stream-chat-javascript-client-browser-1.2.2' \
+  -H 'Referer: https://imgur.com/' \
+  --data-raw '{
+    "data": {},
+    "state": true,
+    "watch": true,
+    "presence": false
+  }'
+```
+
+Browser DevTools may include many additional headers such as `Accept-Language`, `DNT`, `Sec-Fetch-*`, `sec-ch-ua-*`, and `User-Agent`. Those are normally browser metadata rather than core requirements of the API call.
+
+### Node.js `fetch()` example
+
+Node.js 18 and newer include `fetch()` globally.
+
+```js
+const channelId = process.env.IMGUR_STREAM_CHANNEL_ID;
+const userId = process.env.IMGUR_STREAM_USER_ID;
+const apiKey = process.env.IMGUR_STREAM_API_KEY;
+const connectionId = process.env.IMGUR_STREAM_CONNECTION_ID;
+const streamJwt = process.env.IMGUR_STREAM_JWT;
+
+const url =
+  `https://chat-us-east-imgur.stream-io-api.com/channels/messaging/` +
+  `${encodeURIComponent(channelId)}/query?` +
+  new URLSearchParams({
+    user_id: userId,
+    api_key: apiKey,
+    connection_id: connectionId,
+  });
+
+const response = await fetch(url, {
+  method: "POST",
+  headers: {
+    Accept: "application/json, text/plain, */*",
+    Authorization: streamJwt,
+    "Content-Type": "application/json;charset=UTF-8",
+    "stream-auth-type": "jwt",
+    "x-stream-client": "stream-chat-javascript-client-browser-1.2.2",
+    Referer: "https://imgur.com/",
+  },
+  body: JSON.stringify({
+    data: {},
+    state: true,
+    watch: true,
+    presence: false,
+  }),
+});
+
+if (!response.ok) {
+  throw new Error(
+    `Stream query failed: ${response.status} ${response.statusText}`
+  );
+}
+
+const data = await response.json();
+console.log(data);
+```
+
+Keeping the IDs, API key, connection ID, and JWT in environment variables avoids accidentally committing live credentials or session values to source control.
 
 ---
 
